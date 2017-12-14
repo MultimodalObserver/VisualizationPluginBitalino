@@ -62,4 +62,9 @@ public class BitalinoPlayer implements Playable{
         ap.stop();
     }
 
+    @Override
+    public void sync(boolean bln) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
 }
