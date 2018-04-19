@@ -17,7 +17,7 @@ public class BitalinoPlayer implements Playable{
 
     private static final Logger logger = Logger.getLogger(BitalinoPlayer.class.getName());
 
-    public BitalinoPlayer(File file,int sensor) {
+    public BitalinoPlayer(File file,int sensor,String id) {
         ap = new Panel(file,sensor);
         start=ap.start;
         end=ap.end;
@@ -25,6 +25,7 @@ public class BitalinoPlayer implements Playable{
                 @Override
                 public void run() {
                     DockableElement e = new DockableElement();
+                    e.setTitleText(id);
                     e.add(ap);
                     DockablesRegistry.getInstance().addAppWideDockable(e);
                 }

@@ -92,7 +92,7 @@ public class BitalinoVisConfig implements VisualizableConfiguration {
     
     private void ensurePlayerCreated() {
         if (player == null && !files.isEmpty()) {
-            player = new BitalinoPlayer(files.get(0),sensor);
+            player = new BitalinoPlayer(files.get(0),sensor,id);
         }
     }
 
@@ -100,6 +100,7 @@ public class BitalinoVisConfig implements VisualizableConfiguration {
     public void addFile(File file) {
         if ( !files.contains(file) ) {
             this.files.add(file);
+            player = new BitalinoPlayer(files.get(files.size()-1),sensor,id);
         }
     }
 

@@ -9,6 +9,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.ResourceBundle;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JDialog;
@@ -29,6 +30,7 @@ public class BitalinoDialog extends JDialog implements DocumentListener {
     JCheckBox ECG;
     JCheckBox EDA;
     public int sensor_rec;
+    ResourceBundle dialogBundle = java.util.ResourceBundle.getBundle("properties/principal");
 
     ProjectOrganization org;
 
@@ -59,7 +61,7 @@ public class BitalinoDialog extends JDialog implements DocumentListener {
         setLayout(new GridBagLayout());
         GridBConstraints gbc = new GridBConstraints();
 
-        JLabel label = new JLabel("Configuration name: ");
+        JLabel label = new JLabel(dialogBundle.getString("configuration_n"));
         nameField = new JTextField();
         
         ECG = new JCheckBox();
@@ -68,7 +70,7 @@ public class BitalinoDialog extends JDialog implements DocumentListener {
         JLabel sen_ecg = new JLabel("ECG");
         JLabel sen_emg = new JLabel("EMG");
         JLabel sen_eda = new JLabel("EDA");
-        JLabel sensores = new JLabel("Sensors:");
+        JLabel sensores = new JLabel("Sensor:");
         
         nameField.getDocument().addDocumentListener(this);
 
@@ -87,7 +89,7 @@ public class BitalinoDialog extends JDialog implements DocumentListener {
         errorLabel.setForeground(Color.red);
         add(errorLabel, gbc.gx(0).gy(5).gw(5).a(GridBConstraints.LAST_LINE_START).wy(1));
 
-        accept = new JButton("Accept");
+        accept = new JButton(dialogBundle.getString("accept"));
         
         ECG.addActionListener(new ActionListener(){
             @Override
@@ -167,11 +169,11 @@ public class BitalinoDialog extends JDialog implements DocumentListener {
 
     private void updateState() {
         if (nameField.getText().isEmpty()) {
-            errorLabel.setText("A name for this configuration must be specified");
+            errorLabel.setText(dialogBundle.getString("name"));
             accept.setEnabled(false);
         }
         else if(!ECG.isSelected() && !EMG.isSelected() && !EDA.isSelected()){
-            errorLabel.setText("A sensor for this configuration must be selected");
+            errorLabel.setText(dialogBundle.getString("sensor"));
             accept.setEnabled(false);
         }
         else {
