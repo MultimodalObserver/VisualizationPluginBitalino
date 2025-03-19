@@ -39,6 +39,11 @@ public class BitalinoVisConfig implements VisualizableConfiguration {
         files = new ArrayList<>();
     }
     
+    public BitalinoVisConfig(String id) {
+        this();
+        this.id = id;
+    }
+    
    @Override
     public String getId() {
         return id;

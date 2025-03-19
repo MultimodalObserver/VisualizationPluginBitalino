@@ -1,266 +1,264 @@
-
 package vispluginbitalino;
-;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
+
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.util.Duration;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
+import java.util.ResourceBundle;
 
-class Panel extends JPanel {
+public class Panel extends StackPane {
+
     private int escalaX = 20;
     private int escalaY = 10;
-    private static int x0 = 15;
+    private final int x0 = 15;
     private int y0;
-    private int xp,xb,sbValue;
-    private int w,h;
+    private int xp = 0;
     private long fin;
     private int sensor;
     public long start, end;
-    public boolean playing = true;
-    JScrollPane scroller;
-    Dimension area = new Dimension(0,0);
-    JPanel drawingPane;  
-    JScrollBar sb;
-    ArrayList<Long> Tiempo = new ArrayList();
-    ArrayList<Long> Datos = new ArrayList();
-   
-    JButton AmplitudU = new JButton("+");
-    JButton AmplitudD = new JButton("-");
-    JButton LongitudU = new JButton("+");
-    JButton LongitudD = new JButton("-");
-    JLabel Titulo;
-    public Panel(File file, int sensor){
+    private boolean isPlaying = false;
+    private boolean isPaused = false;
+    private long pausedMillis = 0;
+    private Canvas canvas;
+    private ScrollPane scrollPane;
+    private ArrayList<Long> Tiempo = new ArrayList<>();
+    private ArrayList<Long> Datos = new ArrayList<>();
+    private Timeline timeline;
+    private boolean autoScroll = false;
+    ResourceBundle dialogBundle = ResourceBundle.getBundle("properties/principal");
+
+    public Panel(File file, int sensor) {
         this.sensor = sensor;
-        if(sensor==1){
-            Titulo = new JLabel("Electrocardiogram");
+        this.setStyle("-fx-background-color: white;");
+        canvas = new Canvas(800, 400);
+        canvas.setStyle("-fx-background-color: white;");
+        if (file != null && file.exists()) {
+            loadFileData(file);
         }
-        else if(sensor==2){
-            Titulo = new JLabel("Electromiography");
+        scrollPane = new ScrollPane(canvas);
+        scrollPane.setStyle("-fx-background-color: white; -fx-control-inner-background: white;");
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setOnMousePressed(e -> {
+            autoScroll = false;
+        });
+        scrollPane.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+            canvas.setHeight(newBounds.getHeight());
+            redrawAll();
+        });
+        Label titleLabel = new Label(getSensorLabel(sensor));
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-background-color: white;");
+        StackPane.setAlignment(titleLabel, Pos.TOP_CENTER);
+        Button AmplitudU = createStyledButton("+", "#b4eda6");
+        Button AmplitudD = createStyledButton("-", "#ea908a");
+        Button LongitudU = createStyledButton("+", "#b4eda6");
+        Button LongitudD = createStyledButton("-", "#ea908a");
+        AmplitudU.setOnAction(e -> {
+            setUEscalaY();
+            redrawAll();
+        });
+        AmplitudD.setOnAction(e -> {
+            setDEscalaY();
+            redrawAll();
+        });
+        LongitudU.setOnAction(e -> {
+            setUEscalaX();
+            redrawAll();
+        });
+        LongitudD.setOnAction(e -> {
+            setDEscalaX();
+            redrawAll();
+        });
+        GridPane controlGrid = new GridPane();
+        controlGrid.add(AmplitudU, 1, 0);
+        controlGrid.add(AmplitudD, 1, 2);
+        controlGrid.add(LongitudU, 2, 1);
+        controlGrid.add(LongitudD, 0, 1);
+        controlGrid.setAlignment(Pos.TOP_LEFT);
+        controlGrid.setHgap(5);
+        controlGrid.setVgap(5);
+        StackPane.setAlignment(controlGrid, Pos.TOP_LEFT);
+        StackPane.setMargin(controlGrid, new Insets(50, 0, 0, 50));
+        getChildren().addAll(scrollPane, titleLabel, controlGrid);
+        redrawAll();
+    }
+
+    private Button createStyledButton(String text, String color) {
+        Button button = new Button(text);
+        button.setStyle("-fx-background-color: " + color + "; -fx-text-fill: black;");
+        return button;
+    }
+
+    private String getSensorLabel(int sensor) {
+        switch (sensor) {
+            case 1:
+                return dialogBundle.getString("ecd");
+            case 2:
+                return dialogBundle.getString("emg");
+            case 3:
+                return dialogBundle.getString("eda");
+            default:
+                return dialogBundle.getString("def");
         }
-        else if(sensor==3){
-            Titulo = new JLabel("Electrodermal Activity");
-        }
-        xp=x0-5;
-        drawingPane = new DrawingPane();
-        drawingPane.setBackground(Color.WHITE);
-        FileReader fr;
-        try {
-            fr = new FileReader (file);            
-            BufferedReader br = new BufferedReader(fr);
-            
+    }
+
+    private void loadFileData(File file) {
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
             String line;
-            //Lee ch3, sera asignado a EMG
-            while((line = br.readLine())!=null){
-                String ch1 = line.substring(line.indexOf(",")+1);
-                String ch2 = ch1.substring(ch1.indexOf(",")+1);
-                
-                switch (sensor) {
-                    case 1:
-                        Tiempo.add(Long.parseLong(line.substring(0,line.indexOf(","))));
-                        Datos.add(Long.parseLong(ch2.substring(0,ch2.indexOf(","))));
-                        break;
-                    case 2:
-                        Tiempo.add(Long.parseLong(line.substring(0,line.indexOf(","))));
-                        Datos.add(Long.parseLong(ch2.substring(ch2.indexOf(",")+1)));
-                        break;
-                    case 3:                                     
-                        Tiempo.add(Long.parseLong(line.substring(0,line.indexOf(","))));
-                        Datos.add(Long.parseLong(ch1.substring(0,ch1.indexOf(","))));
-                        break;
-                    default:
-                        break;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length > sensor) {
+                    Tiempo.add(Long.parseLong(parts[0]));
+                    Datos.add(Long.parseLong(parts[sensor]));
                 }
             }
             start = Tiempo.get(0);
-            end = Tiempo.get(Tiempo.size()-1);
-            scroller = new JScrollPane(drawingPane);
-            scroller.setPreferredSize(new Dimension(600,150));
-            add(scroller,BorderLayout.CENTER);
-            AmplitudU.addActionListener(new ActionListener(){
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                        setUEscalaY();
-                        repaint();
-                }
-                
-            });  
-            AmplitudD.addActionListener(new ActionListener(){
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                        setDEscalaY();
-                        repaint();
-                }
-                
-            });  
-            LongitudU.addActionListener(new ActionListener(){
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                        setUEscalaX();
-                        repaint();
-                }
-                
-            }); 
-            LongitudD.addActionListener(new ActionListener(){
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                        setDEscalaX();
-                        repaint();
-                }
-                
-            }); 
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(Panel.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(Panel.class.getName()).log(Level.SEVERE, null, ex);
-        }      
-        
-        
-    }   
-    
-    public void graficarEjes(Graphics g) {
-        g.setColor(Color.BLACK);
-        linea(0,0,w,0,g);
-        linea(0,y0,0,-y0,g);
-    }
-    
-    public void graficarProgreso(Graphics g){
-        Color barColor = new Color(255,117,20,127);
-        g.setColor(barColor);
-        g.fillRect(xp, (int) (y0-(drawingPane.getHeight()/1.2)),10,drawingPane.getHeight());
-    }
-    
-    public void play(int millis){
-        int tem = millis/escalaX;
-        xp= x0+tem-5;
-        sb = scroller.getHorizontalScrollBar();
-        if(xp<=fin){
-            repaint();
-            sb.setValue((int)tem-(x0+10));
-            if(sb.getValue()!=sbValue){
-                xb=xp;
-            }
-            sbValue=sb.getValue();
-        }else{
-            xp=x0-5;
-            xb=xp;
-            repaint();         
-            sb.setValue(0);
-        }                   
-    }
-    
-    public void stop(){
-        xp=x0;
-        repaint();
-        sb.setValue(0);
-    }
-    
-    class DrawingPane extends JPanel {
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            w  = getSize().width;
-            h  = getSize().height;
-            y0 = (int) (h/1.2);       
-            AjustarScroll();
-            graficarEscpectrograma(g);
-            graficarEjes(g);
-            graficarProgreso(g);
-            
-            add(Titulo);
-            add(AmplitudU);
-            add(AmplitudD);
-            add(LongitudU);
-            add(LongitudD);
-            AmplitudU.setLocation(xb+37, y0-87);
-            AmplitudD.setLocation(xb+37, y0-33);
-            LongitudU.setLocation(xb+60, y0-60);
-            LongitudD.setLocation(xb+20, y0-60);
-            
+            end = Tiempo.get(Tiempo.size() - 1);
+            fin = end - start;
+        } catch (IOException | NumberFormatException e) {
+            e.printStackTrace();
         }
     }
-    public void setDEscalaX(){
-        if(escalaX<30){            
-            escalaX++;
-        }
-    }
-    public void setUEscalaX(){
-        if(escalaX>5){
+
+    private void setUEscalaX() {
+        if (escalaX > 1) {
             escalaX--;
         }
     }
-    
-    public void setDEscalaY(){
-        if(escalaY<20){            
-            escalaY++;
-        }
+
+    private void setDEscalaX() {
+        escalaX++;
     }
-    public void setUEscalaY(){
-        if(escalaY>2){
+
+    private void setUEscalaY() {
+        if (escalaY > 1) {
             escalaY--;
         }
     }
-    
-    public void graficarEscpectrograma(Graphics g){
-       switch (sensor) {
+
+    private void setDEscalaY() {
+        escalaY++;
+    }
+
+    private void redrawAll() {
+        double waveWidth = (fin / (double) escalaX) + x0 + 50;
+        waveWidth = Math.max(waveWidth, scrollPane.getViewportBounds().getWidth());
+        canvas.setWidth(waveWidth);
+        y0 = (int) (canvas.getHeight() * 0.8);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        gc.setFill(Color.WHITE);
+        gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+        gc.setStroke(Color.BLACK);
+        gc.strokeLine(x0, y0, canvas.getWidth(), y0);
+        gc.strokeLine(x0, 0, x0, canvas.getHeight());
+        gc.setStroke(getSensorColor(sensor));
+        long xi, yi, xf, yf;
+        for (int i = 0; i < Tiempo.size() - 1; i++) {
+            xi = (Tiempo.get(i) - start) / escalaX;
+            yi = Datos.get(i) / escalaY;
+            xf = (Tiempo.get(i + 1) - start) / escalaX;
+            yf = Datos.get(i + 1) / escalaY;
+            gc.strokeLine(x0 + xi, y0 - yi, x0 + xf, y0 - yf);
+        }
+        gc.setFill(Color.ORANGE);
+        gc.fillRect(x0 + xp, 0, 5, canvas.getHeight());
+    }
+
+    private Color getSensorColor(int sensor) {
+        switch (sensor) {
             case 1:
-                g.setColor(Color.BLUE);
-                break;
+                return Color.BLUE;
             case 2:
-                g.setColor(Color.GREEN);
-                break;
-            case 3:      
-                g.setColor(Color.RED);
-                break;
+                return Color.GREEN;
+            case 3:
+                return Color.RED;
             default:
-                break;
+                return Color.BLACK;
         }
-        int size = Tiempo.size();
-        long i, xi=0,xf=0,yi=0,yf=0;
-        for(i=0;i<size;i++){
-            xi = Tiempo.get((int)i)-Tiempo.get(0);
-            xi=xi/escalaX;
-            yi = Datos.get((int)i);
-            yi=yi/escalaY;
-            if((i+1)!=size){                
-                xf = Tiempo.get((int)i+1)-Tiempo.get(0);
-                xf=xf/escalaX;
-                yf = Datos.get((int)i+1);
-                yf=yf/escalaY;
-                linea(xi, yi, xf, yf, g);
+    }
+
+    public void play(long millis) {
+        if (isPaused) {
+            millis = pausedMillis;
+            isPaused = false;
+        }
+        if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
+            timeline.stop();
+        }
+        xp = (int) ((millis - start) / escalaX);
+        isPlaying = true;
+        autoScroll = true; 
+        timeline = new Timeline(new KeyFrame(Duration.millis(50), event -> {
+            xp++;
+            redrawAll();
+            if (autoScroll) {
+                centerProgressLineInView();
             }
+            if (xp > (fin / escalaX)) {
+                stop();
+            }
+        }));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
+    }
+
+
+    public void pause() {
+        if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
+            timeline.pause();
+            pausedMillis = start + (long) xp * escalaX;
+            isPaused = true;
+            autoScroll = false; 
         }
-        fin=xf;
-        if(xf>w) {
-            area.width = (int) (xf+100);
-            drawingPane.setPreferredSize(area);
-            drawingPane.revalidate();
-        } 
     }
-     public void AjustarScroll(){
-        scroller.setPreferredSize(new Dimension(getWidth(),getHeight()));
+
+
+    public void stop() {
+        if (timeline != null) {
+            timeline.stop();
+        }
+        xp = 0;
+        pausedMillis = 0;
+        isPaused = false;
+        isPlaying = false;
+        autoScroll = false; 
+        redrawAll();
     }
-     public void linea(double x1, double y1, double x2, double y2, Graphics g) {
-        g.drawLine((int)Math.round(x1+x0),
-                (int)Math.round(y0-y1),
-                (int)Math.round(x2+x0),
-                (int)Math.round(y0-y2));
+
+
+    private void centerProgressLineInView() {
+        double viewportWidth = scrollPane.getViewportBounds().getWidth();
+        if (viewportWidth <= 0) {
+            return;
+        }
+        double halfView = viewportWidth / 2.0;
+        double desiredCenter = x0 + xp;
+        double minScrollX = desiredCenter - halfView;
+        if (minScrollX < 0) {
+            minScrollX = 0;
+        }
+        double maxScrollX = canvas.getWidth() - viewportWidth;
+        if (maxScrollX < 0) {
+            maxScrollX = 0;
+        }
+        if (minScrollX > maxScrollX) {
+            minScrollX = maxScrollX;
+        }
+        double scrollRatio = (minScrollX) / (canvas.getWidth() - viewportWidth);
+        scrollPane.setHvalue(scrollRatio);
     }
-     
-         
 }
